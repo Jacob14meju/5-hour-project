@@ -1,6 +1,7 @@
 from jinja2 import Environment, FileSystemLoader
 env = Environment(loader=FileSystemLoader('.'))
 template = env.get_template('main.tf.j2')
+import subprocess
 
 aws_region = str(input("enter your AWS region: "))
 ami_id = str(input("enter your AMI ID: "))
@@ -25,3 +26,9 @@ except Exception as e:
     print(f"Error writing to file: {e}")
 
 print("Terraform configuration file 'main.tf' has been generated successfully.")
+
+co = subprocess.run(['bash', 'terra-run.sh'], capture_output=True, text=True)
+if co.returncode != 0:
+    print(f"Error running terra-run.sh: {co.stderr}")
+else:
+    print(f'terra-run.sh executed successfully: {co.stdout}')
