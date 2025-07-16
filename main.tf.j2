@@ -3,30 +3,30 @@ provider "aws" {
     region = "{{ aws_region }}"
     }
 
-resource "aws_vpc" "vm_vpc" {
-    cidr_block = "10.0.0.0/16"
-    enable_dns_support = true
-    enable_dns_hostnames = true
+#resource "aws_vpc" "vm_vpc" {
+ #   cidr_block = "10.0.0.0/16"
+  #  enable_dns_support = true
+   # enable_dns_hostnames = true
 
-    tags = {
-        Name = "vm-vpc"
-    }
-}
+    #tags = {
+     #   Name = "vm-vpc"
+   # }
+#}
 resource "aws_instance" "vm" {
+    count = 2
     ami = "{{ ami_id }}"
     instance_type = "{{ instance_type }}"
-    availability_zone = "{{ availability_zone }}"
-    subnet_id = aws_subnet.public_sub[0].id
+    subnet_id = count.index == 0 ? data.aws_subnet.subnet1.id : data.aws_subnet.subnet2.id
     vpc_security_group_ids = [aws_security_group.vm_sg.id]
     tags = {
-        Name = "vm"
+        Name = "vm-${count.index + 1}"
     }
     }
 
 resource "aws_security_group" "vm_sg" {
     name = "vm_sg"
     description = "Security group for VM"
-    vpc_id = aws_vpc.vm_vpc.id
+    vpc_id = "vpc-084687c42bc6b6be7"
 
     ingress {
         from_port = 22
@@ -44,15 +44,23 @@ resource "aws_security_group" "vm_sg" {
 }
 
 
-resource "aws_subnet" "public_sub" {
-    count = 2
-    vpc_id = aws_vpc.vm_vpc.id
-    cidr_block = "10.0.${count.index}.0/24"
-    availability_zone = "{{ availability_zone }}"
-    map_public_ip_on_launch = true
-    tags = {
-        Name = "public-subnet-${count.index + 1}"
-    }
+#resource "aws_subnet" "public_sub" {
+ ##   count = 2
+  #  vpc_id = aws_vpc.vm_vpc.id
+  #  cidr_block = "10.0.${count.index}.0/24"
+  ##  availability_zone = "{{ availability_zone }}"
+  #  map_public_ip_on_launch = true
+  #  tags = {
+  #      Name = "public-subnet-${count.index + 1}"
+ #   }
+#}
+
+data "aws_subnet" "subnet1" {
+  id = "subnet-0caaa6ff3c583ca10"
+}
+
+data "aws_subnet" "subnet2" {
+  id = "subnet-0dba81b888eb03998"
 }
 
 resource "aws_lb" "vm_lb" {
@@ -60,7 +68,7 @@ resource "aws_lb" "vm_lb" {
     internal = false
     load_balancer_type = "application"
     security_groups = [aws_security_group.vm_sg.id]
-    subnets = aws_subnet.public_sub[*].id
+    subnets = [data.aws_subnet.subnet1.id, data.aws_subnet.subnet2.id]
     enable_deletion_protection = false
 
     tags = {
@@ -72,7 +80,7 @@ resource "aws_lb_target_group" "vm_tg" {
     name = "{{ tg_name }}"
     port = 80
     protocol = "HTTP"
-    vpc_id = aws_vpc.vm_vpc.id
+    vpc_id = "vpc-084687c42bc6b6be7"
 
     tags = {
         Name = "vm-tg"
@@ -91,32 +99,33 @@ resource "aws_lb_listener" "vm_listener" {
 }
 
 resource "aws_lb_target_group_attachment" "vm_tg_attachment" {
+    count = 2
     target_group_arn = aws_lb_target_group.vm_tg.arn
-    target_id = aws_instance.vm.id
+    target_id = aws_instance.vm[count.index].id
+    port = 80
 }
 
-resource "aws_internet_gateway" "vm_igw" {
-    vpc_id = aws_vpc.vm_vpc.id
-
-    tags = {
-        Name = "vm-igw"
-    }
+data "aws_internet_gateway" "existing" {
+  filter {
+    name   = "attachment.vpc-id"
+    values = ["vpc-084687c42bc6b6be7"]
+  }
 }
 
 resource "aws_route_table" "vm_rt" {
-    vpc_id = aws_vpc.vm_vpc.id
+    vpc_id = "vpc-084687c42bc6b6be7"
     route {
         cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.vm_igw.id
+        gateway_id = data.aws_internet_gateway.existing.id
     }
 }
 
-resource "aws_route_table_association" "vm_rta" {
-    count = 2
-    subnet_id = aws_subnet.public_sub[count.index].id
-    route_table_id = aws_route_table.vm_rt.id
+#resource "aws_route_table_association" "vm_rta" {
+   # count = 2
+   # subnet_id = count.index == 0 ? data.aws_subnet.subnet1.id : data.aws_subnet.subnet2.id
+   # route_table_id = aws_route_table.vm_rt.id
 
-}
+#}
 
 resource "null_resource" "waiting_for_vm_ip" {
     provisioner "local-exec" {
@@ -124,7 +133,7 @@ resource "null_resource" "waiting_for_vm_ip" {
       interval=30
       times=5
       for i in $(seq 1 $${times}); do
-          if [ -z "${aws_instance.vm.public_ip}" ]; then
+          if [ -z "${aws_instance.vm[0].public_ip}" ]; then
               echo "Waiting for VM to get public IP..."
               sleep $${interval}
           else
@@ -140,7 +149,7 @@ resource "null_resource" "waiting_for_vm_ip" {
     }
 
 locals {
-  vm_ip_after_wait = aws_instance.vm.public_ip
+  vm_ip_after_wait = [for instance in aws_instance.vm : instance.public_ip]
   _enforce_dep     = null_resource.waiting_for_vm_ip.id
 }
 
@@ -151,15 +160,11 @@ output "vm_public_ip" {
 }
 
 output "vm_id" {
-    value = aws_instance.vm.id
+    value = [for instance in aws_instance.vm : instance.id]
     description = "ID of the VM"
 }
 
 output "lb_dns_name" {
     value = aws_lb.vm_lb.dns_name
     description = "DNS name of the Load Balancer"
-}
-output "lb_arn" {
-    value = aws_lb.vm_lb.arn
-    description = "ARN of the Load Balancer"
 }

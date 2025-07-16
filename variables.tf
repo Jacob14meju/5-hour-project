@@ -1,12 +1,13 @@
 variable "aws_region" {
   description = "The AWS region to deploy resources in"
   type        = string
-  default = "us-east-1"
+  default = "us-east-2"
 validation {
-  condition     = contains(["us-east-1"], var.aws_region)
+  condition     = contains(["us-east-2"], var.aws_region)
     error_message = "The AWS region must be us-east-1."
 }  
 }
+
 
 variable "ami_id" {
   description = "The AMI ID to use for the EC2 instance"
@@ -27,18 +28,18 @@ variable "instance_type" {
   
 }
 
-variable "availability_zone" {
-  description = "The availability zone to deploy the EC2 instance in"
-  type        = list(string)
-  default = ["us-east-1a", "us-east-1b"]
-  validation {
-    condition     = alltrue([
-      for az in var.availability_zone :contains(["us-east-1a", "us-east-1b"], az)
-    ])
-    error_message = "The availability zone must be one of us-east-1a or us-east-1b."
-  }
+#variable "availability_zone" {
+ # description = "The availability zone to deploy the EC2 instance in"
+ # type        = list(string)
+ # default = ["us-east-2a", "us-east-2b"]
+ # validation {
+   # condition     = alltrue([
+   #   for az in var.availability_zone :contains(["us-east-2a", "us-east-2b"], az)
+  #  ])
+  #  error_message = "The availability zone must be one of us-east-1a or us-east-1b."
+ # }
   
-}
+#}
 
 variable "lb_name" {
   description = "The name of the load balancer"
