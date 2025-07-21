@@ -1,7 +1,8 @@
-
 provider "aws" {
     region = "{{ aws_region }}"
     }
+
+#making new vpc if doesnwt exist already
 
 #resource "aws_vpc" "vm_vpc" {
  #   cidr_block = "10.0.0.0/16"
@@ -12,6 +13,9 @@ provider "aws" {
      #   Name = "vm-vpc"
    # }
 #}
+
+# running new instrances in existing vpc
+
 resource "aws_instance" "vm" {
     count = 2
     ami = "{{ ami_id }}"
@@ -22,6 +26,8 @@ resource "aws_instance" "vm" {
         Name = "vm-${count.index + 1}"
     }
     }
+
+#creating new security group opwn to port 22 and 80
 
 resource "aws_security_group" "vm_sg" {
     name = "vm_sg"
@@ -43,6 +49,7 @@ resource "aws_security_group" "vm_sg" {
         }
 }
 
+#creating new 2 pub subnets if not existing already
 
 #resource "aws_subnet" "public_sub" {
  ##   count = 2
@@ -55,6 +62,8 @@ resource "aws_security_group" "vm_sg" {
  #   }
 #}
 
+#using existing subnets
+
 data "aws_subnet" "subnet1" {
   id = "subnet-0caaa6ff3c583ca10"
 }
@@ -62,6 +71,8 @@ data "aws_subnet" "subnet1" {
 data "aws_subnet" "subnet2" {
   id = "subnet-0dba81b888eb03998"
 }
+
+#creating new load balancer and target group
 
 resource "aws_lb" "vm_lb" {
     name = "{{ lb_name }}"
@@ -87,6 +98,8 @@ resource "aws_lb_target_group" "vm_tg" {
     }
 }
 
+#creating new listener and target group attachment
+
 resource "aws_lb_listener" "vm_listener" {
     load_balancer_arn = aws_lb.vm_lb.arn
     port = 80
@@ -105,12 +118,16 @@ resource "aws_lb_target_group_attachment" "vm_tg_attachment" {
     port = 80
 }
 
+#importing existing internet gateway
+
 data "aws_internet_gateway" "existing" {
   filter {
     name   = "attachment.vpc-id"
     values = ["vpc-084687c42bc6b6be7"]
   }
 }
+
+#creating new route table and associating it with the subnets
 
 resource "aws_route_table" "vm_rt" {
     vpc_id = "vpc-084687c42bc6b6be7"
@@ -126,6 +143,8 @@ resource "aws_route_table" "vm_rt" {
    # route_table_id = aws_route_table.vm_rt.id
 
 #}
+
+#waiting for the VM to get public IP and outputting it
 
 resource "null_resource" "waiting_for_vm_ip" {
     provisioner "local-exec" {
@@ -153,16 +172,22 @@ locals {
   _enforce_dep     = null_resource.waiting_for_vm_ip.id
 }
 
+# output vm public ip
+
 
 output "vm_public_ip" {
     value = local.vm_ip_after_wait
     description = "Public IP of the VM"
 }
 
+#outputting vm id
+
 output "vm_id" {
     value = [for instance in aws_instance.vm : instance.id]
     description = "ID of the VM"
 }
+
+#outputting load balancer DNS name
 
 output "lb_dns_name" {
     value = aws_lb.vm_lb.dns_name

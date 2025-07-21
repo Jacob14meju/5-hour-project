@@ -1,3 +1,6 @@
+# This file contains Terraform variables for AWS infrastructure deployment.
+
+
 variable "aws_region" {
   description = "The AWS region to deploy resources in"
   type        = string
@@ -13,8 +16,8 @@ variable "ami_id" {
   description = "The AMI ID to use for the EC2 instance"
   type        = string
   validation {
-    condition     = contains(["ami-02bf8ce06a8ed6092", "ami-0af9b40b1a16fe700"], var.ami_id)
-    error_message = "The AMI ID must be ami-0abcdef1234567890"
+    condition     = contains(["ami-0150ccaf51ab55a51", "ami-0af9b40b1a16fe700"], var.ami_id)
+    error_message = "The AMI ID must be ami-0150ccaf51ab55a51"
   }
 }
 

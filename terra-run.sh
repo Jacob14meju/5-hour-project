@@ -1,13 +1,15 @@
+#!bin/bash
+
+set -e
+
 terraform init
 terraform validate 
 if ! terraform plan -out=tfplan.out; then
     echo "Terraform plan failed."
-    exit 1
 fi
 
 if ! terraform apply -auto-approve tfplan.out; then
     echo "Terraform apply failed."
-    exit 1
 fi
 terraform output -json > terraform_output.json
 echo "Terraform output saved to terraform_output.json"

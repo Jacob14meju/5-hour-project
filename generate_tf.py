@@ -10,6 +10,8 @@ instance_type = str(input("enter your instance type: "))
 lb_name = str(input("enter your load balancer name: "))
 tg_name = str(input("enter your target group name: "))
 
+# importing the template and rendering it with the provided variables
+# Note: Ensure that the variables in the template match those provided here
 
 data = {'aws_region': aws_region,
         'ami_id': ami_id,
@@ -27,8 +29,21 @@ except Exception as e:
 
 print("Terraform configuration file 'main.tf' has been generated successfully.")
 
-co = subprocess.run(['bash', 'terra-run.sh'], capture_output=True, text=True)
-if co.returncode != 0:
-    print(f"Error running terra-run.sh: {co.stderr}")
-else:
-    print(f'terra-run.sh executed successfully: {co.stdout}')
+# Running the terra-run.sh script to apply the Terraform configuration
+try:
+    co = subprocess.Popen(['bash', 'terra-run.sh'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    for line in co.stdout:
+        print(line.decode(), end='')
+
+    if co.returncode != 0:
+        print(f'ERROR: {co.stderr}')
+
+
+    val = subprocess.run(['python3', 'validation_boto3.py']], capture_output=True, text=True)
+    if val.returncode != 0:
+        print(f'Validation Error: {val.stderr}')
+    else:
+        print('Validation completed successfully.')
+except Exception as e:
+    print(f"Error running script automation: {e}")
+print("Terraform configuration applied and validation completed.")
